@@ -1,8 +1,4 @@
-#!/usr/bin/env python
-# coding=utf-8
-
 import json
-
 import logging
 import os
 import random
@@ -201,19 +197,13 @@ def load_label_info(path: str = '../data/firstandsecond.txt', task_type: str = '
             - label2id: Mapping from label names to ids
             - id2label: Mapping from ids to label names
             - label_id2name: Mapping from label ids to display names
-def load_label_info(path='../data/firstandsecond.txt', task_type='first'):
-    """
-    Load label information
-    :param path:
-    :param task_type:
-    :return:
+            - label_name2id: Mapping from display names to label ids
     """
     if path.endswith('.json'):
         with open(path, 'r', encoding='utf-8') as f:
             label_data = json.load(f)
         
-        # Assuming the format of labels.json is as you provided in the example
-        if isinstance(label_data, list) and 'first' in label_data[0] and 'second' in label_data[0]:
+        if isinstance(label_data, list) and len(label_data) > 0:
             categories = label_data[0]['second']
             label2id = {str(i): i for i in range(len(categories))}
             id2label = {v: k for k, v in label2id.items()}
@@ -261,7 +251,6 @@ def main():
         model_args, data_args, training_args = parser.parse_args_into_dataclasses()
 
 
-    # Setup logging
     logging.basicConfig(
         format="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
         datefmt="%m/%d/%Y %H:%M:%S",

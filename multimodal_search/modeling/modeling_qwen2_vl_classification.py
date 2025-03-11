@@ -83,7 +83,7 @@ class Qwen2VLForClassification(Qwen2VLPreTrainedModel):
                 - mrope_position_deltas: Position deltas for multimodal rope
         """
         spatial_merge_size = self.config.vision_config.spatial_merge_size
-        tokens_per_second = 2  # Standard setting for video processing
+        tokens_per_second = 2  # Standard setting for video processing  
         image_token_id = self.config.image_token_id
         video_token_id = self.config.video_token_id
         vision_start_token_id = self.config.vision_start_token_id
@@ -124,7 +124,7 @@ class Qwen2VLForClassification(Qwen2VLPreTrainedModel):
                             image_grid_thw[image_index][1],
                             image_grid_thw[image_index][2],
                         )
-                        second_per_grid_t = 0  # Images don't have temporal dimension
+                        second_per_grid_t = 0
                         image_index += 1
                         remain_images -= 1
                         ed = ed_image
@@ -137,7 +137,7 @@ class Qwen2VLForClassification(Qwen2VLPreTrainedModel):
                         if second_per_grid_ts is not None:
                             second_per_grid_t = second_per_grid_ts[video_index]
                         else:
-                            second_per_grid_t = 1.0  # Default 1 second per temporal grid
+                            second_per_grid_t = 1.0  # Default 1 second per temporal grid   
                         video_index += 1
                         remain_videos -= 1
                         ed = ed_video
@@ -152,7 +152,6 @@ class Qwen2VLForClassification(Qwen2VLPreTrainedModel):
                     st_idx = llm_pos_ids_list[-1].max() + 1 if len(llm_pos_ids_list) > 0 else 0
                     llm_pos_ids_list.append(torch.arange(text_len).view(1, -1).expand(3, -1) + st_idx)
 
-                    # Apply temporal scaling based on seconds per grid
                     t_index = torch.arange(llm_grid_t).view(-1, 1).expand(-1, llm_grid_h * llm_grid_w)
                     t_index = (t_index * second_per_grid_t * tokens_per_second).long().flatten()
                     h_index = torch.arange(llm_grid_h).view(1, -1, 1).expand(llm_grid_t, -1, llm_grid_w).flatten()
@@ -423,7 +422,6 @@ class Qwen2VLForClassification(Qwen2VLPreTrainedModel):
             pixel_values = None
             pixel_values_videos = None
 
-        # if `inputs_embeds` are passed, we only want to use them in the 1st generation step
         if inputs_embeds is not None and cache_position[0] == 0:
             model_inputs = {"inputs_embeds": inputs_embeds, "input_ids": None}
         else:

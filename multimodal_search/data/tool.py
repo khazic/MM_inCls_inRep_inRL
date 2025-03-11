@@ -19,30 +19,52 @@ logger = logging.getLogger(__name__)
 @dataclass
 class VLClassificationDataCollatorWithPadding:
     """
+    VLClassificationDataCollatorWithPadding class is used to collate multiple samples' features into a batch and perform necessary padding.
+    
+    Attributes:
+        vision_config (dict): Configuration dictionary for the vision model.
+        tokenizer (PreTrainedTokenizerBase): Tokenizer used for text, responsible for converting text into a format acceptable by the model.
+        processor (Qwen2VLProcessor): Processor for handling visual and textual data, responsible for transforming input data into the format required by the model.
+        padding (Union[bool, str, PaddingStrategy]): Padding strategy, default is "max_length", indicating padding to the maximum length.
+        max_length (Optional[int]): Maximum length of input sequences, default is 1024.
+        pad_to_multiple_of (Optional[int]): The multiple to pad to, default is 8.
+        return_tensors (str): Type of tensors to return, default is "pt" (PyTorch).
+        label2id (Optional[dict[str, int]]): Mapping dictionary from labels to IDs, used to convert labels into a format acceptable by the model.
+        problem_type (str): Type of problem, indicating whether it is regression, single-label classification, or multi-label classification, default is "multi_label_classification".
+    
+    Methods:
+        __call__(features: List[Dict[str, Any]]) -> BatchFeature:
+            Accepts a list of features, processes them, and returns a batch of features.
+        
+        process_labels(labels):
+            Processes labels based on the problem type and returns the appropriately formatted label tensor.
+        
+        labels_to_ids(labels_list: List[dict]) -> Tensor:
+            Converts a list of labels into a tensor, handling possible string labels, and returns the corresponding ID tensor.
     """
     vision_config: dict
     tokenizer: PreTrainedTokenizerBase
     processor: Qwen2VLProcessor
     padding: Union[bool, str, PaddingStrategy] = "max_length"
-    max_length: Optional[int] = 1024
+    max_length: Optional[int] = 2048
     pad_to_multiple_of: Optional[int] = 8
     return_tensors: str = "pt"
     label2id: Optional[dict[str, int]] = None
     problem_type:str = "multi_label_classification" # "regression" "multi_label_classification" "single_label_classification"
     def __call__(self, features: List[Dict[str, Any]]) -> BatchFeature:
         batch = {
-                'messages':[],
+                'message':[],
                 'text':[],
                 'label':[]
         }
         for feature_item in features:
-            batch['messages'].append(feature_item['messages'])
+            batch['message'].append(feature_item['message'])
             batch['text'].append(feature_item['text'])
             batch['label'].append(feature_item['label'])
         label = self.process_labels(batch['label'])
         max_length = self.max_length
         texts = batch['text']
-        messages = batch['messages']
+        messages = batch['message']
         image_inputs, video_inputs = process_vision_info(messages)
         batch_items = self.processor(
             text=texts,
@@ -62,7 +84,6 @@ class VLClassificationDataCollatorWithPadding:
         if self.problem_type == "regression":
             return torch.tensor(labels, dtype=torch.float)
         elif self.problem_type == "single_label_classification":
-            # 对于CIFAR10，标签可能是字符串形式的数字，需要转换为整数
             return torch.tensor([int(label) for label in labels], dtype=torch.long)
         else:
             return self.labels_to_ids(labels)
@@ -71,14 +92,13 @@ class VLClassificationDataCollatorWithPadding:
     def labels_to_ids(self, labels_list: List[dict]) -> Tensor:
         batch_labels = []
         for label in labels_list:
-            # 处理可能的字符串标签
             if isinstance(label, str):
                 if label in self.label2id:
                     ids = [0.0] * len(self.label2id)
                     ids[self.label2id[label]] = 1.0
                     batch_labels.append(ids)
             else:
-                ids = [0.0] * len(self.label2id)  # BCELoss requires float as target type
+                ids = [0.0] * len(self.label2id)
                 for l in label:
                     if l in self.label2id:
                         ids[self.label2id[l]] = 1.0

@@ -1,8 +1,8 @@
 torchrun --nproc_per_node=8 run_vl_classification.py \
   --model_name_or_path /SHARE/liuchonghan/Qwen2-VL-2B-Instruct \
-  --train_file /liuchonghan/Multimodal_Search/cifar10_processed/train.json \
-  --validation_file /liuchonghan/Multimodal_Search/cifar10_processed/test.json \
-  --label_file /liuchonghan/Multimodal_Search/cifar10_processed/labels.json \
+  --train_file /liuchonghan/Multimodal_Search/data/cifar10_processed/train.json \
+  --validation_file /liuchonghan/Multimodal_Search/data/cifar10_processed/test.json \
+  --label_file /liuchonghan/Multimodal_Search/data/cifar10_processed/labels.json \
   --output_dir /liuchonghan/Multimodal_Search/output/classification_model \
   --num_train_epochs 3 \
   --per_device_train_batch_size 2 \

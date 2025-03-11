@@ -12,10 +12,10 @@ def get_first_and_second(path):
             - second_id2name: Mapping from second-level category id to name.
             - second_name2id: Mapping from second-level category name to id.
     """
-    first_id2name = {}    # Mapping from first-level category id to name
-    first_name2id = {}    # Mapping from first-level category name to id
-    second_id2name = {}   # Mapping from second-level category id to name
-    second_name2id = {}   # Mapping from second-level category name to id
+    first_id2name = {}
+    first_name2id = {}
+    second_id2name = {}
+    second_name2id = {}
     
     try:
         with open(path, 'r', encoding='utf-8') as f:
