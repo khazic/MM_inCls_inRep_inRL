@@ -36,31 +36,61 @@ FPS_MAX_FRAMES = 768
 
 
 def round_by_factor(number: int, factor: int) -> int:
-    """Returns the closest integer to 'number' that is divisible by 'factor'."""
+    """Round a number to the nearest multiple of a factor.
+    
+    Args:
+        number: Number to round
+        factor: Factor to round to
+        
+    Returns:
+        Rounded number that is divisible by factor
+    """
     return round(number / factor) * factor
 
 
 def ceil_by_factor(number: int, factor: int) -> int:
-    """Returns the smallest integer greater than or equal to 'number' that is divisible by 'factor'."""
+    """Round up a number to the nearest multiple of a factor.
+    
+    Args:
+        number: Number to round up
+        factor: Factor to round to
+        
+    Returns:
+        Smallest number >= input that is divisible by factor
+    """
     return math.ceil(number / factor) * factor
 
 
 def floor_by_factor(number: int, factor: int) -> int:
-    """Returns the largest integer less than or equal to 'number' that is divisible by 'factor'."""
+    """Round down a number to the nearest multiple of a factor.
+    
+    Args:
+        number: Number to round down
+        factor: Factor to round to
+        
+    Returns:
+        Largest number <= input that is divisible by factor
+    """
     return math.floor(number / factor) * factor
 
 
 def smart_resize(
     height: int, width: int, factor: int = IMAGE_FACTOR, min_pixels: int = MIN_PIXELS, max_pixels: int = MAX_PIXELS
 ) -> tuple[int, int]:
-    """
-    Rescales the image so that the following conditions are met:
-
-    1. Both dimensions (height and width) are divisible by 'factor'.
-
-    2. The total number of pixels is within the range ['min_pixels', 'max_pixels'].
-
-    3. The aspect ratio of the image is maintained as closely as possible.
+    """Intelligently resize image dimensions while maintaining aspect ratio.
+    
+    Args:
+        height: Original image height
+        width: Original image width
+        factor: Dimension must be divisible by this
+        min_pixels: Minimum total pixels allowed
+        max_pixels: Maximum total pixels allowed
+        
+    Returns:
+        Tuple of (new_height, new_width)
+        
+    Raises:
+        ValueError: If aspect ratio exceeds MAX_RATIO
     """
     if max(height, width) / min(height, width) > MAX_RATIO:
         raise ValueError(
@@ -80,6 +110,18 @@ def smart_resize(
 
 
 def fetch_image(ele: dict[str, str | Image.Image], size_factor: int = IMAGE_FACTOR) -> Image.Image:
+    """Load and preprocess an image from various sources.
+    
+    Args:
+        ele: Dictionary containing image source ('image' or 'image_url')
+        size_factor: Factor for dimension resizing
+        
+    Returns:
+        Preprocessed PIL Image
+        
+    Raises:
+        ValueError: If image source is invalid
+    """
     if "image" in ele:
         image = ele["image"]
     else:
@@ -129,23 +171,18 @@ def smart_nframes(
     total_frames: int,
     video_fps: int | float,
 ) -> int:
-    """calculate the number of frames for video used for model inputs.
-
+    """Calculate optimal number of frames to extract from video.
+    
     Args:
-        ele (dict): a dict contains the configuration of video.
-            support either `fps` or `nframes`:
-                - nframes: the number of frames to extract for model inputs.
-                - fps: the fps to extract frames for model inputs.
-                    - min_frames: the minimum number of frames of the video, only used when fps is provided.
-                    - max_frames: the maximum number of frames of the video, only used when fps is provided.
-        total_frames (int): the original total number of frames of the video.
-        video_fps (int | float): the original fps of the video.
-
-    Raises:
-        ValueError: nframes should in interval [FRAME_FACTOR, total_frames].
-
+        ele: Dictionary with video parameters
+        total_frames: Total frames in original video
+        video_fps: Original video framerate
+        
     Returns:
-        int: the number of frames for video used for model inputs.
+        Number of frames to extract
+        
+    Raises:
+        ValueError: If calculated frames outside valid range
     """
     assert not ("fps" in ele and "nframes" in ele), "Only accept either `fps` or `nframes`"
     if "nframes" in ele:
@@ -165,16 +202,19 @@ def smart_nframes(
 def _read_video_torchvision(
     ele: dict,
 ) -> torch.Tensor:
-    """read video using torchvision.io.read_video
-
+    """Read video using torchvision.io.read_video.
+    
     Args:
-        ele (dict): a dict contains the configuration of video.
-        support keys:
-            - video: the path of video. support "file://", "http://", "https://" and local path.
-            - video_start: the start time of video.
-            - video_end: the end time of video.
+        ele: Dictionary containing:
+            - video: Path to video file
+            - video_start: Start time (optional)
+            - video_end: End time (optional)
+            
     Returns:
-        torch.Tensor: the video tensor with shape (T, C, H, W).
+        Video tensor in TCHW format
+        
+    Note:
+        Supports file://, http://, https:// protocols
     """
     video_path = ele["video"]
     if version.parse(torchvision.__version__) < version.parse("0.19.0"):
@@ -199,6 +239,11 @@ def _read_video_torchvision(
 
 
 def is_decord_available() -> bool:
+    """Check if decord library is available.
+    
+    Returns:
+        True if decord can be imported, False otherwise
+    """
     import importlib.util
 
     return importlib.util.find_spec("decord") is not None
@@ -207,16 +252,17 @@ def is_decord_available() -> bool:
 def _read_video_decord(
     ele: dict,
 ) -> torch.Tensor:
-    """read video using decord.VideoReader
-
+    """Read video using decord.VideoReader.
+    
     Args:
-        ele (dict): a dict contains the configuration of video.
-        support keys:
-            - video: the path of video. support "file://", "http://", "https://" and local path.
-            - video_start: the start time of video.
-            - video_end: the end time of video.
+        ele: Dictionary containing:
+            - video: Path to video file
+            
     Returns:
-        torch.Tensor: the video tensor with shape (T, C, H, W).
+        Video tensor in TCHW format
+        
+    Raises:
+        NotImplementedError: If video_start or video_end is specified
     """
     import decord
     video_path = ele["video"]
@@ -244,6 +290,14 @@ FORCE_QWENVL_VIDEO_READER = os.getenv("FORCE_QWENVL_VIDEO_READER", None)
 
 @lru_cache(maxsize=1)
 def get_video_reader_backend() -> str:
+    """Get the video reader backend to use.
+    
+    Returns:
+        Name of backend ('decord' or 'torchvision')
+        
+    Note:
+        Can be forced via FORCE_QWENVL_VIDEO_READER environment variable
+    """
     if FORCE_QWENVL_VIDEO_READER is not None:
         video_reader_backend = FORCE_QWENVL_VIDEO_READER
     elif is_decord_available():
@@ -255,6 +309,20 @@ def get_video_reader_backend() -> str:
 
 
 def fetch_video(ele: dict, image_factor: int = IMAGE_FACTOR) -> torch.Tensor | list[Image.Image]:
+    """Load and preprocess a video from file or image sequence.
+    
+    Args:
+        ele: Dictionary containing video source and parameters
+        image_factor: Factor for dimension resizing
+        
+    Returns:
+        Either:
+            - Tensor of processed video frames
+            - List of processed image frames
+            
+    Raises:
+        ValueError: If video dimensions are invalid
+    """
     if isinstance(ele["video"], str):
         video_reader_backend = get_video_reader_backend()
         video = VIDEO_READER_BACKENDS[video_reader_backend](ele)
@@ -301,6 +369,14 @@ def fetch_video(ele: dict, image_factor: int = IMAGE_FACTOR) -> torch.Tensor | l
 
 
 def extract_vision_info(conversations: list[dict] | list[list[dict]]) -> list[dict]:
+    """Extract vision-related information from conversation messages.
+    
+    Args:
+        conversations: List of conversation messages or list of conversation lists
+        
+    Returns:
+        List of dictionaries containing vision content (images/videos)
+    """
     vision_infos = []
     if isinstance(conversations[0], dict):
         conversations = [conversations]
@@ -321,8 +397,17 @@ def extract_vision_info(conversations: list[dict] | list[list[dict]]) -> list[di
 def process_vision_info(
     conversations: list[dict] | list[list[dict]],
 ) -> tuple[list[Image.Image] | None, list[torch.Tensor | list[Image.Image]] | None]:
+    """Extract and process vision content from conversations.
+    
+    Args:
+        conversations: List of conversation messages containing vision content
+        
+    Returns:
+        Tuple of:
+            - List of processed images (or None if no images)
+            - List of processed videos as tensors/images (or None if no videos)
+    """
     vision_infos = extract_vision_info(conversations)
-    ## Read images or videos
     image_inputs = []
     video_inputs = []
     for vision_info in vision_infos:

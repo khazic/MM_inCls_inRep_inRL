@@ -13,7 +13,7 @@ from typing import (
     Union,
 )
 import torch
-from vision_process import process_vision_info
+from multimodal_search.utils.vision_process import process_vision_info
 logger = logging.getLogger(__name__)
 
 @dataclass

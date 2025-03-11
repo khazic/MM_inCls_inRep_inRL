@@ -8,7 +8,7 @@ import os
 import random
 import sys
 from dataclasses import dataclass, field
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 
 import datasets
 import evaluate
@@ -34,9 +34,9 @@ from transformers.trainer_utils import get_last_checkpoint
 from transformers.models.qwen2_vl import Qwen2VLProcessor
 import sys
 sys.path.append('../')
-from utils.util import get_first_and_second
-from modeling_qwen2_vl_classification import Qwen2VLForClassification
-from tool import VLClassificationDataCollatorWithPadding, mm_preprocess, PreprocessDataset
+from multimodal_search.utils.util import get_first_and_second
+from multimodal_search.modeling.modeling_qwen2_vl_classification import Qwen2VLForClassification
+from multimodal_search.data.tool import VLClassificationDataCollatorWithPadding, mm_preprocess, PreprocessDataset
 logger = logging.getLogger(__name__)
 
 @dataclass
@@ -187,6 +187,20 @@ class ModelArguments:
     )
 
 
+def load_label_info(path: str = '../data/firstandsecond.txt', task_type: str = 'first') -> Dict[str, Any]:
+    """Load and process label information from file.
+    
+    Args:
+        path: Path to label file, supports .txt and .json formats
+        task_type: Type of labels to load ('first' or 'second' level)
+        
+    Returns:
+        Dict containing:
+            - label_type: Type of labels loaded
+            - num_labels: Number of unique labels
+            - label2id: Mapping from label names to ids
+            - id2label: Mapping from ids to label names
+            - label_id2name: Mapping from label ids to display names
 def load_label_info(path='../data/firstandsecond.txt', task_type='first'):
     """
     Load label information
