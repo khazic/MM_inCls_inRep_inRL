@@ -128,6 +128,10 @@ class DataTrainingArguments:
         default=None, metadata={"help": "A csv or a json file containing the validation data."}
     )
     test_file: Optional[str] = field(default=None, metadata={"help": "A csv or a json file containing the test data."})
+    problem_type: Optional[str] = field(
+        default="single_label_classification",
+        metadata={"help": "Type of problem (e.g., single_label_classification, multi_label_classification)."}
+    )
 
 
 
@@ -183,7 +187,7 @@ class ModelArguments:
     )
 
 
-def load_label_info(path: str = '../data/firstandsecond.txt', task_type: str = 'first') -> Dict[str, Any]:
+def load_label_info(path: str = '../data/cifar10_processed/labels.json', task_type: str = 'first') -> Dict[str, Any]:
     """Load and process label information from file.
     
     Args:
@@ -306,7 +310,7 @@ def main():
     )
     logger.info('loading dataset')
 
-    problem_type =  "multi_label_classification"
+    problem_type = data_args.problem_type
 
     label_info = load_label_info(data_args.label_file, task_type=data_args.task_type)
 
@@ -401,7 +405,7 @@ def main():
         'label2id':label2id,
     }
     data_collator = VLClassificationDataCollatorWithPadding(**data_collator_params)
-    metric = evaluate.load("./evaluation/f1.py", config_name="multilabel", cache_dir=model_args.cache_dir)
+    metric = evaluate.load("../multimodal_search/evaluation/f1.py", config_name="multilabel", cache_dir=model_args.cache_dir)
 
     def sigmoid(z):
         return 1 / (1 + np.exp(-z))

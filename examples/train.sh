@@ -23,4 +23,5 @@ torchrun --nproc_per_node=8 run_vl_classification.py \
   --do_eval \
   --bf16 \
   --overwrite_output_dir \
-  --report_to wandb
+  --report_to wandb \
+  --problem_type single_label_classification
