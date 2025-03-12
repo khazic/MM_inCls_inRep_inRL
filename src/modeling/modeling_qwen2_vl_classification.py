@@ -112,6 +112,10 @@ class Qwen2VLForClassification(Qwen2VLPreTrainedModel):
         Returns:
             position_ids (`torch.LongTensor` of shape `(3, batch_size, sequence_length)`)
             mrope_position_deltas (`torch.Tensor` of shape `(batch_size)`)
+
+        Gets the position ids for Qwen2-VL, it should be generated before sharding the sequence.
+        The batch dim has been removed and the input_ids should be a 1D tensor representing a single example.
+        https://github.com/huggingface/transformers/blob/v4.49.0/src/transformers/models/qwen2_5_vl/modeling_qwen2_5_vl.py#L1546
         """
         spatial_merge_size = self.config.vision_config.spatial_merge_size
         image_token_id = self.config.image_token_id

@@ -1,13 +1,12 @@
-#!/bin/bash
 export CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
 NUM_GPU=8
 PORT_ID=$(expr $RANDOM + 1000)
 export OMP_NUM_THREADS=1
 torchrun --nproc_per_node $NUM_GPU --master_port $PORT_ID  run_vl_classification.py \
     --model_name_or_path /SHARE/liuchonghan/Qwen2.5vl_3b \
-    --train_file "./data/train_dataset.json" \
-    --validation_file "./data/train_dataset.json" \
-    --output_dir './experiment/QwenVL-cls/' \
+    --train_file ./data/train_dataset.json \
+    --validation_file ./data/train_dataset.json \
+    --output_dir ../experiment/QwenVL-cls/ \
     --learning_rate 5e-6 \
     --num_train_epochs 10 \
     --max_eval_samples 2000 \
@@ -27,8 +26,8 @@ torchrun --nproc_per_node $NUM_GPU --master_port $PORT_ID  run_vl_classification
     --adam_epsilon 1e-6 \
     --optim adamw_torch_fused \
     --warmup_steps 5000 \
-    --label_file "./data/label.json" \
-    --report_to wandb \
+    --label_file ./data/label.json \
+    --report_to wandb ../experiment/QwenVL-cls/wandb_logs \
     "$@"
 
 #     --load_best_model_at_end \
