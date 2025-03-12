@@ -51,6 +51,7 @@ class VLClassificationDataCollatorWithPadding:
     return_tensors: str = "pt"
     label2id: Optional[dict[str, int]] = None
     problem_type:str = "multi_label_classification" # "regression" "multi_label_classification" "single_label_classification"
+    
     def __call__(self, features: List[Dict[str, Any]]) -> BatchFeature:
         batch = {
                 'message':[],
