@@ -67,6 +67,7 @@ class Qwen2VLForClassification(Qwen2VLPreTrainedModel):
         input_ids: torch.LongTensor,
         image_grid_thw: Optional[torch.LongTensor] = None,
         video_grid_thw: Optional[torch.LongTensor] = None,
+        second_per_grid_ts: Optional[torch.Tensor] = None,
         attention_mask: Optional[torch.Tensor] = None,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         """
@@ -103,6 +104,8 @@ class Qwen2VLForClassification(Qwen2VLPreTrainedModel):
                 The temporal, height and width of feature shape of each image in LLM.
             video_grid_thw (`torch.LongTensor` of shape `(num_videos, 3)`, *optional*):
                 The temporal, height and width of feature shape of each video in LLM.
+            second_per_grid_ts (`torch.Tensor` of shape `(num_videos,)`, *optional*):
+                The time duration of each video frame.
             attention_mask (`torch.Tensor` of shape `(batch_size, sequence_length)`, *optional*):
                 Mask to avoid performing attention on padding token indices. Mask values selected in `[0, 1]`:
 
@@ -114,6 +117,7 @@ class Qwen2VLForClassification(Qwen2VLPreTrainedModel):
             mrope_position_deltas (`torch.Tensor` of shape `(batch_size)`)
         """
         spatial_merge_size = self.config.vision_config.spatial_merge_size
+        tokens_per_second = 2
         image_token_id = self.config.image_token_id
         video_token_id = self.config.video_token_id
         vision_start_token_id = self.config.vision_start_token_id
@@ -146,20 +150,17 @@ class Qwen2VLForClassification(Qwen2VLPreTrainedModel):
                     else:
                         ed_video = len(input_tokens) + 1
                     if ed_image < ed_video:
-                        t, h, w = (
-                            image_grid_thw[image_index][0],
-                            image_grid_thw[image_index][1],
-                            image_grid_thw[image_index][2],
-                        )
+                        t, h, w = image_grid_thw[image_index]
+                        second_per_grid_t = 0
                         image_index += 1
                         remain_images -= 1
                         ed = ed_image
                     else:
-                        t, h, w = (
-                            video_grid_thw[video_index][0],
-                            video_grid_thw[video_index][1],
-                            video_grid_thw[video_index][2],
-                        )
+                        t, h, w = video_grid_thw[video_index]
+                        if second_per_grid_ts is not None:
+                            second_per_grid_t = second_per_grid_ts[video_index]
+                        else:
+                            second_per_grid_t = 1.0
                         video_index += 1
                         remain_videos -= 1
                         ed = ed_video
@@ -173,7 +174,8 @@ class Qwen2VLForClassification(Qwen2VLPreTrainedModel):
                     st_idx = llm_pos_ids_list[-1].max() + 1 if len(llm_pos_ids_list) > 0 else 0
                     llm_pos_ids_list.append(torch.arange(text_len).view(1, -1).expand(3, -1) + st_idx)
 
-                    t_index = torch.arange(llm_grid_t).view(-1, 1).expand(-1, llm_grid_h * llm_grid_w).flatten()
+                    t_index = torch.arange(llm_grid_t).view(-1, 1).expand(-1, llm_grid_h * llm_grid_w)
+                    t_index = (t_index * second_per_grid_t * tokens_per_second).long().flatten()
                     h_index = torch.arange(llm_grid_h).view(1, -1, 1).expand(llm_grid_t, -1, llm_grid_w).flatten()
                     w_index = torch.arange(llm_grid_w).view(1, 1, -1).expand(llm_grid_t, llm_grid_h, -1).flatten()
                     llm_pos_ids_list.append(torch.stack([t_index, h_index, w_index]) + text_len + st_idx)
@@ -254,25 +256,6 @@ class Qwen2VLForClassification(Qwen2VLPreTrainedModel):
                 Labels for computing the masked language modeling loss. Indices should either be in `[0, ...,
                 config.vocab_size]` or -100 (see `input_ids` docstring). Tokens with indices set to `-100` are ignored
                 (masked), the loss is only computed for the tokens with labels in `[0, ..., config.vocab_size]`.
-
-        Returns:
-
-        Example:
-        :param use_cache:
-        :param output_attentions:
-        :param output_hidden_states:
-        :param return_dict:
-        :param pixel_values:
-        :param pixel_values_videos:
-        :param image_grid_thw:
-        :param video_grid_thw:
-        :param rope_deltas:
-        :param labels:
-        :param inputs_embeds:
-        :param past_key_values:
-        :param position_ids:
-        :param attention_mask:
-        :param input_ids:
         """
 
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions

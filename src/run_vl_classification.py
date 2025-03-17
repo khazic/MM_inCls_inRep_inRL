@@ -1,6 +1,3 @@
-#!/usr/bin/env python
-# coding=utf-8
-
 import json
 
 import logging
@@ -32,10 +29,10 @@ from transformers import (
 )
 from transformers.trainer_utils import get_last_checkpoint
 from transformers.models.qwen2_vl import Qwen2VLProcessor
-# from transformers.utils import send_example_telemetry
+
 import sys
 sys.path.append('../')
-from modeling_qwen2_vl_classification import Qwen2VLForClassification
+from modeling.modeling_qwen2_vl_classification import Qwen2VLForClassification
 from tool import VLClassificationDataCollatorWithPadding, mm_preprocess, PreprocessDataset
 logger = logging.getLogger(__name__)
 
@@ -188,7 +185,6 @@ def main():
         model_args, data_args, training_args = parser.parse_args_into_dataclasses()
 
 
-    # Setup logging
     logging.basicConfig(
         format="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
         datefmt="%m/%d/%Y %H:%M:%S",
@@ -196,7 +192,6 @@ def main():
     )
 
     if training_args.should_log:
-        # The default of training_args.log_level is passive, so we set log level at info here to have that default.
         transformers.utils.logging.set_verbosity_info()
 
     log_level = training_args.get_process_log_level()
@@ -206,14 +201,12 @@ def main():
     transformers.utils.logging.enable_default_handler()
     transformers.utils.logging.enable_explicit_format()
 
-    # Log on each process the small summary:
     logger.warning(
         f"Process rank: {training_args.local_rank}, device: {training_args.device}, n_gpu: {training_args.n_gpu}, "
         + f"distributed training: {training_args.parallel_mode.value == 'distributed'}, 16-bits training: {training_args.fp16 or training_args.bf16}"
     )
     logger.info(f"Training/evaluation parameters {training_args}")
 
-    # Detecting last checkpoint.
     last_checkpoint = None
     if os.path.isdir(training_args.output_dir) and training_args.do_train and not training_args.overwrite_output_dir:
         last_checkpoint = get_last_checkpoint(training_args.output_dir)
@@ -228,7 +221,6 @@ def main():
                 "the `--output_dir` or add `--overwrite_output_dir` to train from scratch."
             )
 
-    # Set seed before initializing model.
     set_seed(training_args.seed)
     extension = 'json'
     data_files = {}
@@ -279,7 +271,6 @@ def main():
         token=model_args.token,
         trust_remote_code=model_args.trust_remote_code,
     )
-    # Load image_processor, in this script we only use this to get the mean and std for normalization.
     Processor = AutoProcessor.from_pretrained(
         model_args.model_name_or_path,
         cache_dir=model_args.cache_dir,
@@ -337,7 +328,7 @@ def main():
         'label2id':label2id,
     }
     data_collator = VLClassificationDataCollatorWithPadding(**data_collator_params)
-    metric = evaluate.load("./f1.py", config_name="multilabel", cache_dir=model_args.cache_dir)
+    metric = evaluate.load("../src/metrics/f1.py", config_name="multilabel", cache_dir=model_args.cache_dir)
 
     def sigmoid(z):
         return 1 / (1 + np.exp(-z))
@@ -347,9 +338,8 @@ def main():
 
         theld = 0.4
         pred = np.greater(sigmoid(preds), theld).astype(np.int64)
-        preds = np.array([np.where(p > 0, 1, 0) for p in preds])  # convert logits to multi-hot encoding
+        preds = np.array([np.where(p > 0, 1, 0) for p in preds])
         result = metric.compute(predictions=preds, references=p.label_ids, average="micro")
-        # Micro F1 is commonly used in multi-label classification
         labels = p.label_ids.astype(np.int64)
         r = classification_report(y_true=labels, y_pred=pred, output_dict=True, zero_division=1)
         r = [v for k, v in r.items() if 'weighted' in k]
@@ -359,11 +349,8 @@ def main():
             result["combined_score"] = np.mean(list(result.values())).item()
         return result
 
-    # Data collator will default to DataCollatorWithPadding when the tokenizer is passed to Trainer, so we change it if
-    # we already did the padding.
 
 
-    # Initialize our Trainer
     trainer = Trainer(
         model=model,
         args=training_args,
@@ -387,7 +374,7 @@ def main():
             data_args.max_train_samples if data_args.max_train_samples is not None else len(train_dataset)
         )
         metrics["train_samples"] = min(max_train_samples, len(train_dataset))
-        trainer.save_model()  # Saves the tokenizer too for easy upload
+        trainer.save_model()  
         Processor.save_pretrained(trainer.args.output_dir)
         tokenizer.save_pretrained(trainer.args.output_dir)
         trainer.log_metrics("train", metrics)
@@ -406,7 +393,6 @@ def main():
 
 
 def _mp_fn(index):
-    # For xla_spawn (TPUs)
     main()
 
 
