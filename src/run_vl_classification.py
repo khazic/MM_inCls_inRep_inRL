@@ -15,7 +15,7 @@ from datasets import Dataset, DatasetDict, concatenate_datasets, load_dataset
 
 import transformers
 from joblib import Parallel, delayed
-from sklearn.metrics import classification_report
+from sklearn.metrics import classification_report, f1_score
 from tqdm import tqdm
 from transformers import (
     AutoConfig,
@@ -237,7 +237,7 @@ def main():
     )
     logger.info('loading dataset')
 
-    problem_type =  "multi_label_classification"
+    problem_type =  "single_label_classification"
 
     label_info = json.load(open(data_args.label_file))
     num_labels = len(label_info['label2id'])
@@ -313,7 +313,8 @@ def main():
     eval_dataset = dataset["validation"]
     if data_args.max_eval_samples is not None:
         max_eval_samples = min(len(eval_dataset), data_args.max_eval_samples)
-        eval_dataset = eval_dataset.select(range(max_eval_samples))
+        random_indices = random.sample(range(len(eval_dataset)), max_eval_samples)
+        eval_dataset = eval_dataset.select(random_indices)
 
 
     with training_args.main_process_first(desc="eval dataset map pre-processing", local=False):
@@ -335,19 +336,55 @@ def main():
 
     def compute_metrics(p: EvalPrediction):
         preds = p.predictions[0] if isinstance(p.predictions, tuple) else p.predictions
-
-        theld = 0.4
-        pred = np.greater(sigmoid(preds), theld).astype(np.int64)
-        preds = np.array([np.where(p > 0, 1, 0) for p in preds])
-        result = metric.compute(predictions=preds, references=p.label_ids, average="micro")
-        labels = p.label_ids.astype(np.int64)
-        r = classification_report(y_true=labels, y_pred=pred, output_dict=True, zero_division=1)
-        r = [v for k, v in r.items() if 'weighted' in k]
-        r = r[0]
-        result.update(r)
-        if len(result) > 1:
-            result["combined_score"] = np.mean(list(result.values())).item()
-        return result
+        
+        if len(preds.shape) == 2 and preds.shape[1] > 1:
+            pred_labels = np.argmax(preds, axis=1)
+            
+            predictions = pred_labels.tolist()
+            references = p.label_ids.tolist()
+            
+            print("\n预测结果和真实标签：")
+            for i, (pred, ref) in enumerate(zip(predictions, references)):
+                print(f"样本{i}: 预测={pred}, 真实={ref}")
+            
+            f1 = f1_score(references, predictions, average="macro", zero_division=1)
+            result = {"f1": f1}
+            
+            r = classification_report(
+                y_true=references, 
+                y_pred=predictions, 
+                output_dict=True,
+                zero_division=1
+            )
+            
+            weighted_metrics = r['weighted avg']
+            result.update({
+                'precision': weighted_metrics['precision'],
+                'recall': weighted_metrics['recall'],
+                'f1-score': weighted_metrics['f1-score'],
+                'support': weighted_metrics['support']
+            })
+            
+            valid_metrics = [v for k, v in result.items() 
+                            if isinstance(v, (int, float)) and k != 'support']
+            if valid_metrics:
+                result["combined_score"] = np.mean(valid_metrics).item()
+            
+            return result
+        
+        else:
+            theld = 0.4
+            pred = np.greater(sigmoid(preds), theld).astype(np.int64)
+            preds = np.array([np.where(p > 0, 1, 0) for p in preds])
+            result = metric.compute(predictions=preds, references=p.label_ids, average="micro")
+            labels = p.label_ids.astype(np.int64)
+            r = classification_report(y_true=labels, y_pred=pred, output_dict=True, zero_division=1)
+            r = [v for k, v in r.items() if 'weighted' in k]
+            r = r[0]
+            result.update(r)
+            if len(result) > 1:
+                result["combined_score"] = np.mean(list(result.values())).item()
+            return result
 
 
 

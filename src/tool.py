@@ -29,7 +29,7 @@ class VLClassificationDataCollatorWithPadding:
     pad_to_multiple_of: Optional[int] = 8
     return_tensors: str = "pt"
     label2id: Optional[dict[str, int]] = None
-    problem_type:str = "multi_label_classification" # "regression" "multi_label_classification" "single_label_classification"
+    problem_type:str = "single_label_classification" # "regression" "multi_label_classification" "single_label_classification"
     def __call__(self, features: List[Dict[str, Any]]) -> BatchFeature:
         batch = {
                 'messages':[],
@@ -64,7 +64,11 @@ class VLClassificationDataCollatorWithPadding:
         if self.problem_type == "regression":
             return torch.tensor(labels, dtype=torch.float)
         elif self.problem_type == "single_label_classification":
-            return torch.tensor(labels, dtype=torch.long)
+            processed_labels = []
+            for label_list in labels:
+                label = int(label_list[0])
+                processed_labels.append(label)
+            return torch.tensor(processed_labels, dtype=torch.long)
         else:
             return self.labels_to_ids(labels)
 
