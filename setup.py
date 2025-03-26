@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 
 setup(
-    name="multimodal_search",
+    name="MM_inCls_inRep_inRL",
     version="0.1.0",
     packages=find_packages(),
     install_requires=[

@@ -44,10 +44,8 @@ class Qwen2VLForClassification(Qwen2VLPreTrainedModel):
         self.visual = Qwen2VisionTransformerPretrainedModel._from_config(config.vision_config)
         self.model = Qwen2VLModel(config)
         self.vocab_size = config.vocab_size
-        # self.lm_head = nn.Linear(config.hidden_size, config.vocab_size, bias=False)
-        self.padding_side = "left"  # set it to left by default, user can use setter to change padding_sides
+        self.padding_side = "left"
         self.score = nn.Linear(config.hidden_size, self.num_labels, bias=False)
-        # Initialize weights and apply final processing
         self.post_init()
 
     def get_input_embeddings(self):
@@ -371,9 +369,6 @@ class Qwen2VLForClassification(Qwen2VLPreTrainedModel):
                 loss_fct = CrossEntropyLoss()
                 loss = loss_fct(pooled_logits.view(-1, self.num_labels), labels.view(-1))
             elif self.config.problem_type == "multi_label_classification":
-                # print(labels)
-                # print()
-                # print(pooled_logits)
                 loss_fct = BCEWithLogitsLoss()
                 loss = loss_fct(pooled_logits, labels)
 
@@ -435,7 +430,6 @@ class Qwen2VLForClassification(Qwen2VLPreTrainedModel):
             pixel_values = None
             pixel_values_videos = None
 
-        # if `inputs_embeds` are passed, we only want to use them in the 1st generation step
         if inputs_embeds is not None and cache_position[0] == 0:
             model_inputs = {"inputs_embeds": inputs_embeds, "input_ids": None}
         else:

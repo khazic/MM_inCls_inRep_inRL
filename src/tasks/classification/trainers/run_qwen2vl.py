@@ -1,5 +1,4 @@
 import json
-
 import logging
 import os
 import random
@@ -30,10 +29,12 @@ from transformers import (
 from transformers.trainer_utils import get_last_checkpoint
 from transformers.models.qwen2_vl import Qwen2VLProcessor
 
-import sys
-sys.path.append('../')
-from modeling.modeling_qwen2_vl_classification import Qwen2VLForClassification
-from tool import VLClassificationDataCollatorWithPadding, mm_preprocess, PreprocessDataset
+import os.path as osp
+root_dir = osp.abspath(osp.join(osp.dirname(__file__), "../../../.."))
+sys.path.insert(0, root_dir)
+
+from src.modeling.modeling_qwen2_vl_classification import Qwen2VLForClassification
+from src.utils.tool import VLClassificationDataCollatorWithPadding, mm_preprocess, PreprocessDataset
 logger = logging.getLogger(__name__)
 
 @dataclass
@@ -121,6 +122,13 @@ class DataTrainingArguments:
         default=None, metadata={"help": "A csv or a json file containing the validation data."}
     )
     test_file: Optional[str] = field(default=None, metadata={"help": "A csv or a json file containing the test data."})
+    problem_type: str = field(
+        default="single_label_classification",
+        metadata={
+            "help": "Problem type for classification. One of 'single_label_classification', 'multi_label_classification'",
+            "choices": ["single_label_classification", "multi_label_classification"]
+        },
+    )
 
 
 
@@ -132,6 +140,10 @@ class ModelArguments:
 
     model_name_or_path: str = field(
         metadata={"help": "Path to pretrained model or model identifier from huggingface.co/models"}
+    )
+    model_type: Optional[str] = field(
+        default=None,
+        metadata={"help": "Model type, e.g. qwen2vl"}
     )
     config_name: Optional[str] = field(
         default=None, metadata={"help": "Pretrained config name or path if not the same as model_name"}
@@ -237,7 +249,8 @@ def main():
     )
     logger.info('loading dataset')
 
-    problem_type =  "single_label_classification"
+    problem_type = data_args.problem_type
+    logger.info(f"Using problem type: {problem_type}")
 
     label_info = json.load(open(data_args.label_file))
     num_labels = len(label_info['label2id'])
@@ -329,7 +342,7 @@ def main():
         'label2id':label2id,
     }
     data_collator = VLClassificationDataCollatorWithPadding(**data_collator_params)
-    metric = evaluate.load("../src/metrics/f1.py", config_name="multilabel", cache_dir=model_args.cache_dir)
+    metric = evaluate.load(os.path.join(root_dir, "src/metrics/f1.py"), config_name="multilabel", cache_dir=model_args.cache_dir)
 
     def sigmoid(z):
         return 1 / (1 + np.exp(-z))
@@ -337,9 +350,8 @@ def main():
     def compute_metrics(p: EvalPrediction):
         preds = p.predictions[0] if isinstance(p.predictions, tuple) else p.predictions
         
-        if len(preds.shape) == 2 and preds.shape[1] > 1:
+        if problem_type == "single_label_classification":
             pred_labels = np.argmax(preds, axis=1)
-            
             predictions = pred_labels.tolist()
             references = p.label_ids.tolist()
             
@@ -357,34 +369,34 @@ def main():
                 zero_division=1
             )
             
-            weighted_metrics = r['weighted avg']
-            result.update({
-                'precision': weighted_metrics['precision'],
-                'recall': weighted_metrics['recall'],
-                'f1-score': weighted_metrics['f1-score'],
-                'support': weighted_metrics['support']
-            })
-            
-            valid_metrics = [v for k, v in result.items() 
-                            if isinstance(v, (int, float)) and k != 'support']
-            if valid_metrics:
-                result["combined_score"] = np.mean(valid_metrics).item()
-            
-            return result
-        
-        else:
+        else:  # multi_label_classification
             theld = 0.4
             pred = np.greater(sigmoid(preds), theld).astype(np.int64)
-            preds = np.array([np.where(p > 0, 1, 0) for p in preds])
-            result = metric.compute(predictions=preds, references=p.label_ids, average="micro")
-            labels = p.label_ids.astype(np.int64)
-            r = classification_report(y_true=labels, y_pred=pred, output_dict=True, zero_division=1)
-            r = [v for k, v in r.items() if 'weighted' in k]
-            r = r[0]
-            result.update(r)
-            if len(result) > 1:
-                result["combined_score"] = np.mean(list(result.values())).item()
-            return result
+            predictions = np.array([np.where(p > 0, 1, 0) for p in pred])
+            references = p.label_ids
+            
+            result = metric.compute(predictions=predictions, references=references, average="micro")
+            r = classification_report(
+                y_true=references, 
+                y_pred=predictions, 
+                output_dict=True, 
+                zero_division=1
+            )
+        
+        weighted_metrics = r['weighted avg']
+        result.update({
+            'precision': weighted_metrics['precision'],
+            'recall': weighted_metrics['recall'],
+            'f1-score': weighted_metrics['f1-score'],
+            'support': weighted_metrics['support']
+        })
+        
+        valid_metrics = [v for k, v in result.items() 
+                        if isinstance(v, (int, float)) and k != 'support']
+        if valid_metrics:
+            result["combined_score"] = np.mean(valid_metrics).item()
+        
+        return result
 
 
 
@@ -434,4 +446,4 @@ def _mp_fn(index):
 
 
 if __name__ == "__main__":
-    main()
+    main() 

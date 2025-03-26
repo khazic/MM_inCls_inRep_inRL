@@ -335,4 +335,4 @@ def process_vision_info(
         image_inputs = None
     if len(video_inputs) == 0:
         video_inputs = None
-    return image_inputs, video_inputs
+    return image_inputs, video_inputs 
