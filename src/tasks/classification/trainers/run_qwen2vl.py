@@ -57,7 +57,7 @@ class DataTrainingArguments:
         },
     )
     max_seq_length: int = field(
-        default=1024,
+        default=2048,
         metadata={
             "help": (
                 "The maximum total input sequence length after tokenization. Sequences longer "
@@ -85,7 +85,7 @@ class DataTrainingArguments:
         default=False, metadata={"help": "Whether to shuffle the train dataset or not."}
     )
     shuffle_seed: int = field(
-        default=42, metadata={"help": "Random seed that will be used to shuffle the train dataset."}
+        default=2025, metadata={"help": "Random seed that will be used to shuffle the train dataset."}
     )
     max_train_samples: Optional[int] = field(
         default=None,
@@ -121,7 +121,9 @@ class DataTrainingArguments:
     validation_file: Optional[str] = field(
         default=None, metadata={"help": "A csv or a json file containing the validation data."}
     )
-    test_file: Optional[str] = field(default=None, metadata={"help": "A csv or a json file containing the test data."})
+    test_file: Optional[str] = field(
+        default=None, metadata={"help": "A csv or a json file containing the test data."}
+    )
     problem_type: str = field(
         default="single_label_classification",
         metadata={
@@ -355,9 +357,9 @@ def main():
             predictions = pred_labels.tolist()
             references = p.label_ids.tolist()
             
-            print("\n预测结果和真实标签：")
+            print("\nPredicted results and true labels:")
             for i, (pred, ref) in enumerate(zip(predictions, references)):
-                print(f"样本{i}: 预测={pred}, 真实={ref}")
+                print(f"Sample {i}: Predicted={pred}, True={ref}")
             
             f1 = f1_score(references, predictions, average="macro", zero_division=1)
             result = {"f1": f1}
@@ -369,7 +371,7 @@ def main():
                 zero_division=1
             )
             
-        else:  # multi_label_classification
+        else:
             theld = 0.4
             pred = np.greater(sigmoid(preds), theld).astype(np.int64)
             predictions = np.array([np.where(p > 0, 1, 0) for p in pred])
@@ -410,7 +412,6 @@ def main():
         data_collator=data_collator,
     )
 
-    # Training
     if training_args.do_train:
         checkpoint = None
         if training_args.resume_from_checkpoint is not None:
@@ -430,7 +431,6 @@ def main():
         trainer.save_metrics("train", metrics)
         trainer.save_state()
 
-    # Evaluation
     if training_args.do_eval:
         logger.info("*** Evaluate ***")
         metrics = trainer.evaluate(eval_dataset=eval_dataset)

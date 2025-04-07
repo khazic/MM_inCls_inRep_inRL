@@ -76,7 +76,7 @@ class VLClassificationDataCollatorWithPadding:
     def labels_to_ids(self, labels_list: List[dict]) -> Tensor:
         batch_labels = []
         for labels in labels_list:
-            ids = [0.0] * len(self.label2id)  # BCELoss requires float as target type
+            ids = [0.0] * len(self.label2id)
             for label in labels:
                 if label in self.label2id:
                     ids[self.label2id[label]] = 1.0

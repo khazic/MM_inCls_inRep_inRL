@@ -33,4 +33,4 @@ torchrun --nproc_per_node $NUM_GPU --master_port $PORT_ID \
     --warmup_steps 200 \
     --report_to wandb \
     --model_type qwen2vl \
-    --problem_type single_label_classification 
+    --problem_type single_label_classification   # "regression" "multi_label_classification" "single_label_classification"
